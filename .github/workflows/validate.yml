@@ -24,3 +24,18 @@ jobs:
       - run: bun test
       - run: bun run check
       - run: bun run typecheck
+      - name: Run independent Python adapter
+        env:
+          CI_PROVIDER: github-actions
+          EVIDENCE_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 -m unittest discover -s runners/python/tests
+          python3 runners/python/stacks_protocol_runner.py --output /tmp/python-conformance-report.json
+          bun run validate:report /tmp/python-conformance-report.json --summary /tmp/python-conformance-report.md
+      - name: Upload independent conformance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-conformance-report
+          path: |
+            /tmp/python-conformance-report.json
+            /tmp/python-conformance-report.md
