@@ -24,6 +24,26 @@ export interface Catalog {
   extensions: Array<{ id: string, name: string, requires: string[] }>
 }
 
+export interface FixtureCorpus {
+  suiteVersion: string
+  catalogRevision: number
+  fixtures: Array<{
+    id: string
+    profile: Profile
+    requirements: string[]
+    title: string
+    prerequisites: string[]
+    setup: { clock: string, seed: number, state?: unknown }
+    steps: Array<{ operation: string, input: unknown, expect: Record<string, unknown> }>
+    normalization: {
+      timestamps: string[]
+      identifiers: string[]
+      paths: string[]
+      orderInsensitivePaths: string[]
+    }
+  }>
+}
+
 export function validateCatalog(catalog: Catalog): string[] {
   const errors: string[] = []
   const seen = new Set<string>()
@@ -89,14 +109,71 @@ ${extensions}
 `
 }
 
+export function validateFixtures(catalog: Catalog, corpus: FixtureCorpus, driverContracts: Record<string, any>): string[] {
+  const errors: string[] = []
+  const requirements = new Map(catalog.requirements.map(requirement => [requirement.id, requirement]))
+  const fixtureIds = new Set<string>()
+  const covered = new Set<string>()
+  const rank: Record<Profile, number> = { Core: 0, Standard: 1, Complete: 2 }
+
+  if (corpus.catalogRevision !== catalog.catalogRevision)
+    errors.push(`fixture catalog revision ${corpus.catalogRevision} does not match ${catalog.catalogRevision}`)
+
+  for (const fixture of corpus.fixtures) {
+    if (!/^fixture\.[a-z0-9.-]+$/.test(fixture.id)) errors.push(`${fixture.id}: invalid fixture ID`)
+    if (fixtureIds.has(fixture.id)) errors.push(`${fixture.id}: duplicate fixture ID`)
+    fixtureIds.add(fixture.id)
+    if (!Number.isInteger(fixture.setup.seed)) errors.push(`${fixture.id}: setup seed must be an integer`)
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(fixture.setup.clock)) errors.push(`${fixture.id}: setup clock must be fixed UTC milliseconds`)
+    if (fixture.steps.length === 0) errors.push(`${fixture.id}: must contain at least one step`)
+
+    for (const id of fixture.requirements) {
+      const requirement = requirements.get(id)
+      if (!requirement) {
+        errors.push(`${fixture.id}: unknown requirement ${id}`)
+        continue
+      }
+      covered.add(id)
+      if (rank[fixture.profile] < rank[requirement.profile]) errors.push(`${fixture.id}: ${fixture.profile} fixture cannot satisfy ${requirement.profile} requirement ${id}`)
+    }
+    for (const step of fixture.steps) {
+      if (!/^[a-z][a-z0-9.-]+$/.test(step.operation)) errors.push(`${fixture.id}: invalid operation '${step.operation}'`)
+      if (!step.expect || Object.keys(step.expect).length === 0) errors.push(`${fixture.id}: ${step.operation} has no expectations`)
+    }
+  }
+
+  for (const requirement of catalog.requirements.filter(requirement => requirement.evidence === 'behavior')) {
+    if (!covered.has(requirement.id)) errors.push(`${requirement.id}: behavioral requirement has no fixture`)
+  }
+
+  const contractNames = Object.keys(driverContracts.contracts || {})
+  for (const name of ['database', 'queue', 'cache', 'storage', 'mail', 'realtime', 'deploy']) {
+    if (!contractNames.includes(name)) errors.push(`missing ${name} driver contract`)
+    else if (!Array.isArray(driverContracts.contracts[name].operations) || driverContracts.contracts[name].operations.length === 0)
+      errors.push(`${name} driver contract has no operations`)
+  }
+  for (const result of ['pass', 'fail', 'skipped', 'unsupported', 'exception', 'experimental']) {
+    if (!driverContracts.resultStates?.includes(result)) errors.push(`driver contracts omit result state '${result}'`)
+  }
+
+  return errors
+}
+
 export function loadCatalog(root: string): Catalog {
   return JSON.parse(readFileSync(resolve(root, 'protocol/1.0-draft/catalog.json'), 'utf8')) as Catalog
+}
+
+export function loadFixtureCorpus(root: string): FixtureCorpus {
+  return JSON.parse(readFileSync(resolve(root, 'protocol/1.0-draft/fixtures/conformance.json'), 'utf8')) as FixtureCorpus
 }
 
 if (import.meta.main) {
   const root = resolve(import.meta.dir, '..')
   const catalog = loadCatalog(root)
   const errors = validateCatalog(catalog)
+  const corpus = loadFixtureCorpus(root)
+  const driverContracts = JSON.parse(readFileSync(resolve(root, 'protocol/1.0-draft/driver-contracts.json'), 'utf8'))
+  errors.push(...validateFixtures(catalog, corpus, driverContracts))
   if (errors.length > 0) {
     for (const error of errors) console.error(`error: ${error}`)
     process.exit(1)
@@ -114,6 +191,6 @@ if (import.meta.main) {
       console.error('error: protocol/1.0-draft/REQUIREMENTS.md is stale; run bun run generate')
       process.exit(1)
     }
-    console.log(`Protocol catalog checks passed (${catalog.requirements.length} requirements, ${catalog.extensions.length} extensions)`)
+    console.log(`Protocol checks passed (${catalog.requirements.length} requirements, ${corpus.fixtures.length} fixtures, ${catalog.extensions.length} extensions)`)
   }
 }
