@@ -7,3 +7,8 @@
 Draft and Proposed RFCs are not decisions. Rejected and Withdrawn RFCs remain in
 the repository so rejected alternatives and prior discussion stay discoverable.
 
+## Active proposals
+
+| RFC | Status | Review window |
+| --- | --- | --- |
+| [0002](../rfcs/0002-protocol-requirements-and-profiles.md) | Proposed | 2026-07-21 through 2026-08-20 |
