@@ -1,0 +1,38 @@
+name: RFC proposal
+description: Propose a language-neutral Stacks Protocol decision
+title: "rfc: "
+labels: ["rfc"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Observable problem
+      description: Describe the interoperability, portability, or security problem.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Link fixtures, implementations, incidents, or ambiguity reports.
+    validations:
+      required: true
+  - type: dropdown
+    id: class
+    attributes:
+      label: Proposed change class
+      options: [Compatible, Behavioral, Breaking, Ratification]
+    validations:
+      required: true
+  - type: textarea
+    id: profiles
+    attributes:
+      label: Requirements and profiles affected
+    validations:
+      required: true
+  - type: textarea
+    id: migration
+    attributes:
+      label: Migration and rollback
+      description: Required for behavioral or breaking proposals.
+
