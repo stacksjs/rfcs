@@ -14,3 +14,4 @@ the repository so rejected alternatives and prior discussion stay discoverable.
 | [0002](../rfcs/0002-protocol-requirements-and-profiles.md) | Proposed | 2026-07-21 through 2026-08-20 |
 | [0003](../rfcs/0003-conformance-fixtures-and-driver-contracts.md) | Proposed | 2026-07-21 through 2026-08-20 |
 | [0004](../rfcs/0004-conformance-report-format.md) | Proposed | 2026-07-21 through 2026-08-20 |
+| [0005](../rfcs/0005-versioned-environment-encryption.md) | Proposed | 2026-07-21 through 2026-08-20 |
